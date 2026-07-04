@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Universal AR Viewer | Mahdi Jahangiri</title>
+    
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+    
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --font-fa: 'Vazirmatn', Tahoma, sans-serif;
+            --font-en: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+            
+            --glass-bg: rgba(255, 255, 255, 0.25);
+            --glass-bg-hover: rgba(255, 255, 255, 0.35);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --glass-shadow: rgba(0, 0, 0, 0.08);
+            --glass-highlight: rgba(255, 255, 255, 0.8);
+            
+            --apple-blue: #007AFF;
+            --apple-purple: #AF52DE;
+            --apple-pink: #FF2D55;
+            --apple-gray: #8E8E93;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        body {
+            font-family: var(--font-fa);
+            background: linear-gradient(135deg, 
+                #667eea 0%, 
+                #764ba2 25%, 
+                #f093fb 50%, 
+                #4facfe 75%, 
+                #667eea 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 25s ease infinite;
+            color: #1d1d1f;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        /* ===== Apple-Style Liquid Glass ===== */
+        .apple-glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px) saturate(200%) brightness(1.1);
+            -webkit-backdrop-filter: blur(40px) saturate(200%) brightness(1.1);
+            border: 0.5px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: 
+                0 0 0 0.5px rgba(255, 255, 255, 0.3),
+                0 10px 40px var(--glass-shadow),
+                0 2px 10px rgba(0, 0, 0, 0.04),
+                inset 0 1px 0 var(--glass-highlight),
+                inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .apple-glass::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255, 255, 255, 0.4), 
+                transparent);
+            animation: shimmer 4s infinite;
+            pointer-events: none;
+        }
+        
+        @keyframes shimmer {
+            to { left: 100%; }
+        }
+        
+        .apple-glass:hover {
+            background: var(--glass-bg-hover);
+            transform: translateY(-2px);
+        }
+        
+        /* ===== صفحه لودینگ ===== */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        
+        .loading-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .loader-apple {
+            width: 80px;
+            height: 80px;
+            position: relative;
+        }
+        
+        .loader-apple::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            animation: applePulse 1.5s ease-in-out infinite;
+        }
+        
+        .loader-apple::after {
+            content: '';
+            position: absolute;
+            inset: 10px;
+            border: 3px solid transparent;
+            border-top-color: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            animation: appleSpin 1s linear infinite;
+        }
+        
+        @keyframes applePulse {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.1); opacity: 0.5; }
+        }
+        
+        @keyframes appleSpin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 20px;
+            font-weight: 500;
+            margin-top: 30px;
+            font-family: var(--font-fa);
+        }
+        
+        /* ===== هدر ===== */
+        .header {
+            padding: 30px 20px;
+            text-align: center;
+            animation: slideDown 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .header-glass {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 30px 40px;
+        }
+        
+        .header h1 {
+            font-family: var(--font-fa);
+            font-size: 36px;
+            font-weight: 700;
+            color: #1d1d1f;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            font-family: var(--font-en);
+            font-size: 13px;
+            color: #6e6e73;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: 500;
+        }
+        
+        /* ===== کانتینر اصلی ===== */
+        .main-container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 25px;
+            animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both;
+        }
+        
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* ===== بخش آپلود ===== */
+        .upload-section {
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .upload-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1d1d1f;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .upload-zone {
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .upload-zone:hover {
+            border-color: var(--apple-blue);
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.02);
+        }
+        
+        .upload-zone.dragover {
+            border-color: var(--apple-blue);
+            background: rgba(0, 122, 255, 0.1);
+            transform: scale(1.05);
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .upload-text {
+            font-size: 16px;
+            font-weight: 500;
+            color: #1d1d1f;
+            margin-bottom: 8px;
+        }
+        
+        .upload-subtext {
+            font-size: 12px;
+            color: #6e6e73;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .url-input-container {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .url-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 0.5px solid rgba(255, 255, 255, 0.4);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(20px);
+            font-family: var(--font-en);
+            font-size: 13px;
+            color: #1d1d1f;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        
+        .url-input:focus {
+            border-color: var(--apple-blue);
+            background: rgba(255, 255, 255, 0.5);
+        }
+        
+        .url-input::placeholder {
+            color: #6e6e73;
+        }
+        
+        .load-url-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--apple-blue), var(--apple-purple));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-family: var(--font-fa);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
+        }
+        
+        .load-url-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 122, 255, 0.5);
+        }
+        
+        /* ===== اطلاعات مدل ===== */
+        .model-info {
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .model-info.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .info-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #1d1d1f;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 0.5px solid rgba(255, 255, 255, 0.2);
+            font-size: 12px;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            color: #6e6e73;
+            font-weight: 500;
+        }
+        
+        .info-value {
+            color: #1d1d1f;
+            font-weight: 600;
+            font-family: var(--font-en);
+        }
+        
+        /* ===== کانتینر مدل ===== */
+        .model-wrapper {
+            padding: 15px;
+        }
+        
+        model-viewer {
+            width: 100%;
+            height: 650px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            --poster-color: transparent;
+        }
+        
+        .no-model-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #6e6e73;
+            pointer-events: none;
+        }
+        
+        .no-model-message.hidden {
+            display: none;
+        }
+        
+        .no-model-icon {
+            font-size: 64px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        
+        .no-model-text {
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        /* ===== پنل کنترل ===== */
+        .control-panel {
+            padding: 25px;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+        
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1d1d1f;
+            text-align: center;
+        }
+        
+        .control-section {
+            margin-bottom: 20px;
+            padding-bottom: 18px;
+            border-bottom: 0.5px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .control-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #6e6e73;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .toggle-btn {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(20px);
+            border: 0.5px solid rgba(255, 255, 255, 0.4);
+            color: #1d1d1f;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-family: var(--font-fa);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.5);
+            transform: translateX(-2px);
+        }
+        
+        .toggle-btn.active {
+            background: linear-gradient(135deg, var(--apple-blue), var(--apple-purple));
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
+        }
+        
+        .toggle-btn .icon {
+            font-size: 18px;
+            margin-left: 8px;
+        }
+        
+        .toggle-btn .status {
+            font-size: 10px;
+            opacity: 0.6;
+            font-family: var(--font-en);
+            text-transform: uppercase;
+        }
+        
+        .reset-btn {
+            width: 100%;
+            background: rgba(255, 59, 48, 0.2);
+            backdrop-filter: blur(20px);
+            border: 0.5px solid rgba(255, 59, 48, 0.4);
+            color: #ff3b30;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-family: var(--font-fa);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .reset-btn:hover {
+            background: rgba(255, 59, 48, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        /* ===== دکمه AR ===== */
+        .ar-button {
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            background: linear-gradient(135deg, var(--apple-blue) 0%, var(--apple-purple) 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: var(--font-fa);
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(0, 122, 255, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 20;
+        }
+        
+        .ar-button:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 12px 32px rgba(0, 122, 255, 0.5);
+        }
+        
+        /* ===== فوتر ===== */
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            margin-top: 60px;
+        }
+        
+        .footer-glass {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 25px;
+        }
+        
+        .footer .designer-name {
+            font-family: var(--font-en);
+            font-size: 18px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 6px;
+        }
+        
+        .footer .powered-by {
+            font-family: var(--font-en);
+            font-size: 11px;
+            color: #6e6e73;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        
+        /* ===== ریسپانسیو ===== */
+        @media (max-width: 968px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .control-panel {
+                position: static;
+            }
+            
+            .header h1 { font-size: 28px; }
+            model-viewer { height: 500px; }
+        }
+        
+        @media (max-width: 480px) {
+            .header h1 { font-size: 24px; }
+            model-viewer { height: 400px; }
+            .upload-zone { padding: 30px 20px; }
+            .url-input-container { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- صفحه لودینگ -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loader-apple"></div>
+        <div class="loading-text">در حال بارگذاری</div>
+    </div>
+    
+    <!-- هدر -->
+    <div class="header">
+        <div class="header-glass apple-glass">
+            <h1>🌐 Universal AR Viewer</h1>
+            <p>Load Any GLB Model in AR</p>
+        </div>
+    </div>
+    
+    <!-- کانتینر اصلی -->
+    <div class="main-container">
+        
+        <!-- ستون چپ: آپلود و مدل -->
+        <div>
+            
+            <!-- بخش آپلود -->
+            <div class="upload-section apple-glass">
+                <div class="upload-title">
+                    <span>📦</span>
+                    <span>بارگذاری مدل سه‌بعدی</span>
+                </div>
+                
+                <!-- Drag & Drop Zone -->
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">فایل GLB را اینجا رها کنید</div>
+                    <div class="upload-subtext">یا کلیک کنید برای انتخاب فایل</div>
+                    <input type="file" id="fileInput" class="file-input" accept=".glb,.gltf">
+                </div>
+                
+                <!-- URL Input -->
+                <div class="url-input-container">
+                    <input 
+                        type="url" 
+                        id="urlInput" 
+                        class="url-input" 
+                        placeholder="یا لینک مستقیم فایل GLB را وارد کنید...">
+                    <button class="load-url-btn" onclick="loadModelFromURL()">بارگذاری</button>
+                </div>
+            </div>
+            
+            <!-- اطلاعات مدل -->
+            <div class="model-info apple-glass" id="modelInfo">
+                <div class="info-title">📊 اطلاعات مدل</div>
+                <div class="info-item">
+                    <span class="info-label">نام فایل:</span>
+                    <span class="info-value" id="fileName">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">حجم:</span>
+                    <span class="info-value" id="fileSize">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">وضعیت:</span>
+                    <span class="info-value" id="fileStatus">در حال بارگذاری...</span>
+                </div>
+            </div>
+            
+            <!-- کانتینر مدل -->
+            <div class="model-wrapper apple-glass" style="position: relative;">
+                <div class="no-model-message" id="noModelMessage">
+                    <div class="no-model-icon">📦</div>
+                    <div class="no-model-text">لطفاً یک مدل سه‌بعدی بارگذاری کنید</div>
+                </div>
+                
+                <model-viewer 
+                    id="modelViewer"
+                    alt="مدل سه‌بعدی"
+                    ar 
+                    ar-modes="webxr scene-viewer quick-look"
+                    camera-controls 
+                    auto-rotate
+                    auto-rotate-delay="3000"
+                    rotation-per-second="30deg"
+                    shadow-intensity="1.5"
+                    shadow-softness="0.8"
+                    exposure="1.2"
+                    tone-mapping="neutral"
+                    camera-orbit="45deg 75deg 2.5m"
+                    ar-scale="auto"
+                    style="display: none;">
+                    
+                    <button slot="ar-button" class="ar-button">
+                        📱 مشاهده در AR
+                    </button>
+                </model-viewer>
+            </div>
+            
+        </div>
+        
+        <!-- ستون راست: پنل کنترل -->
+        <div class="control-panel apple-glass">
+            <div class="panel-title">🎮 پنل کنترل</div>
+            
+            <!-- حالت‌های ویژه -->
+            <div class="control-section">
+                <div class="section-title">حالت‌های ویژه</div>
+                
+                <button class="toggle-btn" id="xrayBtn" onclick="toggleXray()">
+                    <span>
+                        <span class="icon">🔬</span>
+                        <span>نمای اشعه ایکس</span>
+                    </span>
+                    <span class="status">خاموش</span>
+                </button>
+                
+                <button class="toggle-btn active" id="rotateBtn" onclick="toggleAutoRotate()">
+                    <span>
+                        <span class="icon">🔄</span>
+                        <span>چرخش خودکار</span>
+                    </span>
+                    <span class="status">روشن</span>
+                </button>
+            </div>
+            
+            <!-- اقدامات -->
+            <div class="control-section">
+                <div class="section-title">اقدامات</div>
+                
+                <button class="reset-btn" onclick="resetViewer()">
+                    <span>🗑️</span>
+                    <span>پاک کردن مدل</span>
+                </button>
+            </div>
+            
+            <!-- راهنما -->
+            <div class="control-section">
+                <div class="section-title">راهنما</div>
+                <div style="font-size: 11px; color: #6e6e73; line-height: 1.8;">
+                    • فایل GLB را آپلود کنید<br>
+                    • یا لینک مستقیم را وارد کنید<br>
+                    • برای چرخش، مدل را بکشید<br>
+                    • دکمه AR برای تجربه واقعی
+                </div>
+            </div>
+        </div>
+        
+    </div>
+    
+    <!-- فوتر -->
+    <div class="footer">
+        <div class="footer-glass apple-glass">
+            <div class="designer-name">Designed by Mahdi Jahangiri</div>
+            <div class="powered-by">Universal AR Viewer</div>
+        </div>
+    </div>
+    
+    <script>
+        // ===== متغیرهای سراسری =====
+        const modelViewer = document.getElementById('modelViewer');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const urlInput = document.getElementById('urlInput');
+        const modelInfo = document.getElementById('modelInfo');
+        const noModelMessage = document.getElementById('noModelMessage');
+        
+        // ===== مخفی کردن لودینگ =====
+        setTimeout(() => loadingOverlay.classList.add('hidden'), 1500);
+        
+        // ===== Drag & Drop =====
+        uploadZone.addEventListener('click', () => fileInput.click());
+        
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        // ===== بارگذاری فایل =====
+        function handleFile(file) {
+            // بررسی فرمت فایل
+            if (!file.name.endsWith('.glb') && !file.name.endsWith('.gltf')) {
+                alert('لطفاً فقط فایل‌های GLB یا GLTF را بارگذاری کنید');
+                return;
+            }
+            
+            // نمایش اطلاعات فایل
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileStatus').textContent = 'در حال بارگذاری...';
+            modelInfo.classList.add('active');
+            
+            // ایجاد URL موقت
+            const url = URL.createObjectURL(file);
+            loadModel(url, file.name);
+        }
+        
+        // ===== بارگذاری از URL =====
+        function loadModelFromURL() {
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                alert('لطفاً یک لینک معتبر وارد کنید');
+                return;
+            }
+            
+            if (!url.endsWith('.glb') && !url.endsWith('.gltf')) {
+                alert('لطفاً فقط لینک‌های GLB یا GLTF را وارد کنید');
+                return;
+            }
+            
+            // استخراج نام فایل از URL
+            const fileName = url.split('/').pop();
+            
+            document.getElementById('fileName').textContent = fileName;
+            document.getElementById('fileSize').textContent = 'نامشخص';
+            document.getElementById('fileStatus').textContent = 'در حال بارگذاری...';
+            modelInfo.classList.add('active');
+            
+            loadModel(url, fileName);
+        }
+        
+        // ===== بارگذاری مدل در model-viewer =====
+        function loadModel(url, fileName) {
+            modelViewer.src = url;
+            modelViewer.style.display = 'block';
+            noModelMessage.classList.add('hidden');
+            
+            modelViewer.addEventListener('load', () => {
+                document.getElementById('fileStatus').textContent = '✓ بارگذاری شد';
+            }, { once: true });
+            
+            modelViewer.addEventListener('error', () => {
+                document.getElementById('fileStatus').textContent = '✗ خطا در بارگذاری';
+                alert('خطا در بارگذاری مدل. لطفاً فایل دیگری را امتحان کنید.');
+            }, { once: true });
+        }
+        
+        // ===== فرمت حجم فایل =====
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+        
+        // ===== X-Ray Mode =====
+        let xrayActive = false;
+        
+        function toggleXray() {
+            xrayActive = !xrayActive;
+            const btn = document.getElementById('xrayBtn');
+            const status = btn.querySelector('.status');
+            
+            if (xrayActive) {
+                btn.classList.add('active');
+                status.textContent = 'روشن';
+                
+                modelViewer.model?.materials.forEach(mat => {
+                    if (mat.pbrMetallicRoughness?.setRoughnessFactor) {
+                        mat.pbrMetallicRoughness.setRoughnessFactor(0.1);
+                    }
+                    if (mat.setAlphaMode) {
+                        mat.setAlphaMode('blend');
+                    }
+                    if (mat.setDoubleSided) {
+                        mat.setDoubleSided(true);
+                    }
+                });
+            } else {
+                btn.classList.remove('active');
+                status.textContent = 'خاموش';
+                
+                modelViewer.model?.materials.forEach(mat => {
+                    if (mat.pbrMetallicRoughness?.setRoughnessFactor) {
+                        mat.pbrMetallicRoughness.setRoughnessFactor(0.5);
+                    }
+                    if (mat.setAlphaMode) {
+                        mat.setAlphaMode('opaque');
+                    }
+                    if (mat.setDoubleSided) {
+                        mat.setDoubleSided(false);
+                    }
+                });
+            }
+        }
+        
+        // ===== Auto Rotate =====
+        let autoRotateActive = true;
+        
+        function toggleAutoRotate() {
+            autoRotateActive = !autoRotateActive;
+            const btn = document.getElementById('rotateBtn');
+            const status = btn.querySelector('.status');
+            
+            if (autoRotateActive) {
+                btn.classList.add('active');
+                status.textContent = 'روشن';
+                modelViewer.setAttribute('auto-rotate', '');
+            } else {
+                btn.classList.remove('active');
+                status.textContent = 'خاموش';
+                modelViewer.removeAttribute('auto-rotate');
+            }
+        }
+        
+        // ===== Reset Viewer =====
+        function resetViewer() {
+            if (!confirm('آیا مطمئن هستید؟ مدل فعلی پاک خواهد شد.')) {
+                return;
+            }
+            
+            modelViewer.src = '';
+            modelViewer.style.display = 'none';
+            noModelMessage.classList.remove('hidden');
+            modelInfo.classList.remove('active');
+            fileInput.value = '';
+            urlInput.value = '';
+            
+            // ریست X-Ray
+            if (xrayActive) {
+                toggleXray();
+            }
+        }
+        
+        // ===== بررسی URL Parameter =====
+        window.addEventListener('load', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const modelUrl = urlParams.get('model');
+            
+            if (modelUrl) {
+                urlInput.value = modelUrl;
+                loadModelFromURL();
+            }
+        });
+    </script>
+    
+</body>
+</html>
